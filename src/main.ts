@@ -19,6 +19,7 @@ export default class ExcalidrawLivePlugin extends Plugin {
 	private session: LiveSession | null = null;
 	private hostLabel = "";
 	private statusEl!: HTMLElement;
+	private leadRibbonEl!: HTMLElement;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -30,6 +31,9 @@ export default class ExcalidrawLivePlugin extends Plugin {
 		this.refreshStatus();
 
 		this.addRibbonIcon("radio-tower", t("ribbon"), (e) => this.showMenu(e));
+		this.addRibbonIcon("locate-fixed", t("ribbonShareView"), () => this.shareView());
+		this.leadRibbonEl = this.addRibbonIcon("cast", t("ribbonLead"), () => this.toggleLead());
+		this.leadRibbonEl.addClass("excalidraw-live-lead");
 
 		this.addCommand({ id: "host", name: t("cmdHost"), callback: () => this.startHost() });
 		this.addCommand({ id: "join", name: t("cmdJoin"), callback: () => this.openJoin() });
@@ -48,6 +52,24 @@ export default class ExcalidrawLivePlugin extends Plugin {
 			checkCallback: (checking) => {
 				if (!this.session) return false;
 				if (!checking) this.session.resync();
+				return true;
+			},
+		});
+		this.addCommand({
+			id: "share-view",
+			name: t("cmdShareView"),
+			checkCallback: (checking) => {
+				if (!this.session) return false;
+				if (!checking) this.shareView();
+				return true;
+			},
+		});
+		this.addCommand({
+			id: "lead-view",
+			name: t("cmdLead"),
+			checkCallback: (checking) => {
+				if (!this.session) return false;
+				if (!checking) this.toggleLead();
 				return true;
 			},
 		});
@@ -99,6 +121,12 @@ export default class ExcalidrawLivePlugin extends Plugin {
 			onPeersChanged: () => this.refreshStatus(),
 			onPeerJoined: (p) => new Notice(t("peerJoined", { name: p.name })),
 			onPeerLeft: (p) => new Notice(t("peerLeft", { name: p.name })),
+			onFollowChanged: () => {
+				const s = getSession();
+				const leader = s?.leader ? s.peers.get(s.leader) : null;
+				if (leader) new Notice(t("followStarted", { name: leader.name }));
+				this.refreshStatus();
+			},
 			onEnded: (reason) => {
 				if (this.session === getSession()) {
 					this.session = null;
@@ -228,6 +256,24 @@ export default class ExcalidrawLivePlugin extends Plugin {
 		}
 	}
 
+	private shareView(): void {
+		if (!this.session) {
+			new Notice(t("noSession"));
+			return;
+		}
+		this.session.shareView();
+	}
+
+	private toggleLead(): void {
+		const s = this.session;
+		if (!s) {
+			new Notice(t("noSession"));
+			return;
+		}
+		s.setLeading(!s.leading);
+		new Notice(t(s.leading ? "leadOn" : "leadOff"));
+	}
+
 	private showHostInfo(): void {
 		new HostInfoModal(this.app, this.settings.port, !!this.settings.hostKey).open();
 	}
@@ -250,6 +296,15 @@ export default class ExcalidrawLivePlugin extends Plugin {
 			if (s.role === "host") {
 				menu.addItem((i) => i.setTitle(t("menuAddresses")).setIcon("copy").onClick(() => this.showHostInfo()));
 			}
+			menu.addItem((i) => i.setTitle(t("menuShareView")).setIcon("locate-fixed").onClick(() => this.shareView()));
+			menu.addItem((i) =>
+				i
+					.setTitle(t("menuLead"))
+					.setIcon("cast")
+					.setChecked(s.leading)
+					.onClick(() => this.toggleLead()),
+			);
+			menu.addSeparator();
 			menu.addItem((i) => i.setTitle(t("menuResync")).setIcon("refresh-cw").onClick(() => s.resync()));
 			menu.addItem((i) =>
 				i
@@ -265,16 +320,23 @@ export default class ExcalidrawLivePlugin extends Plugin {
 		if (!this.statusEl) return;
 		const s = this.session;
 		this.statusEl.toggleClass("is-live", !!s);
+		this.leadRibbonEl?.toggleClass("is-active", !!s?.leading);
 		if (!s) {
 			this.statusEl.setText(t("statusOff"));
 			this.statusEl.setAttr("aria-label", t("statusOffTip"));
 		} else if (s.role === "host") {
-			this.statusEl.setText(t("statusHost", { count: s.peers.size }));
+			this.statusEl.setText(t("statusHost", { count: s.peers.size }) + this.followSuffix(s));
 			this.statusEl.setAttr("aria-label", t("statusHostTip", { port: this.settings.port, count: s.peers.size }));
 		} else {
-			this.statusEl.setText(t("statusClient", { host: this.hostLabel }));
+			this.statusEl.setText(t("statusClient", { host: this.hostLabel }) + this.followSuffix(s));
 			this.statusEl.setAttr("aria-label", t("statusClientTip", { host: this.hostLabel }));
 		}
+	}
+
+	private followSuffix(s: LiveSession): string {
+		if (s.leading) return t("statusLeading");
+		const leader = s.leader ? s.peers.get(s.leader) : null;
+		return leader ? t("statusFollowing", { name: leader.name }) : "";
 	}
 }
 

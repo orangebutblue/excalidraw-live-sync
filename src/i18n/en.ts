@@ -6,6 +6,10 @@ export const en = {
 	cmdShowAddresses: "Show addresses to connect",
 	cmdResync: "Resync drawing",
 	cmdStop: "End live session",
+	cmdShareView: "Show everyone my view (once)",
+	cmdLead: "Others follow my view (on/off)",
+	ribbonShareView: "Live: show everyone my view (once)",
+	ribbonLead: "Live: others follow my view (on/off)",
 
 	endStopped: "Stopped manually",
 	endTabClosed: "The drawing tab was closed",
@@ -32,6 +36,8 @@ export const en = {
 	menuNoPeers: "Nobody here yet",
 	menuAddresses: "Addresses to connect",
 	menuResync: "Resync",
+	menuShareView: "Show everyone my view",
+	menuLead: "Others follow my view",
 	menuEnd: "End session",
 	menuLeave: "Disconnect",
 
@@ -41,6 +47,13 @@ export const en = {
 	statusHostTip: "Hosting on port {port}, participants: {count}",
 	statusClient: "● Live: {host}",
 	statusClientTip: "Connected to {host}",
+	statusLeading: " · leading",
+	statusFollowing: " · following {name}",
+
+	noSession: "No live session is running",
+	leadOn: "Excalidraw Live: the others now follow your view",
+	leadOff: "Excalidraw Live: the others no longer follow your view",
+	followStarted: "Excalidraw Live: following {name}'s view",
 
 	netClosed: "Connection closed",
 	netTimeout: "Connection timed out",

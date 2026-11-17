@@ -11,7 +11,7 @@ import {
 	sessionCiphers,
 } from "./crypto";
 import { t } from "./i18n";
-import { BinaryFile, HOST_ID, Message, PeerInfo, PROTOCOL_VERSION, RELAYED, SceneElement } from "./protocol";
+import { BinaryFile, HOST_ID, isVolatile, Message, PeerInfo, PROTOCOL_VERSION, RELAYED, SceneElement } from "./protocol";
 
 const MAX_BUFFER = 256 * 1024 * 1024; // a single message may carry embedded images
 const MAX_LINE = 64 * 1024; // handshake lines are tiny
@@ -224,7 +224,7 @@ export class LiveHost implements Transport {
 
 	send(msg: Message): void {
 		const out = { ...msg, from: HOST_ID } as Message;
-		for (const c of this.clients) if (c.peer) c.ls.send(out, out.t === "pointer");
+		for (const c of this.clients) if (c.peer) c.ls.send(out, isVolatile(out));
 	}
 
 	close(): void {
@@ -258,7 +258,7 @@ export class LiveHost implements Transport {
 		if (!RELAYED.has(msg.t)) return;
 		const out = { ...msg, from } as Message;
 		for (const other of this.clients) {
-			if (other !== client && other.peer) other.ls.send(out, out.t === "pointer");
+			if (other !== client && other.peer) other.ls.send(out, isVolatile(out));
 		}
 		this.events.onMessage(out);
 	}
@@ -421,7 +421,7 @@ export class LiveClient implements Transport {
 	}
 
 	send(msg: Message): void {
-		this.ls.send(msg, msg.t === "pointer");
+		this.ls.send(msg, isVolatile(msg));
 	}
 
 	close(): void {

@@ -73,6 +73,19 @@ After disconnecting, each participant keeps their copy as a regular local file.
 
 The interface follows Obsidian's language: Russian when Obsidian is set to Russian, English otherwise.
 
+## View sharing (this fork)
+
+Any participant can move everyone else to the part of the drawing they are looking at:
+
+- **Show everyone my view (once)** — the crosshair button in the ribbon, the status bar menu or the command palette. The others jump to your view once.
+- **Others follow my view (on/off)** — the cast button in the ribbon (highlighted while on), the status bar menu or the command palette. While it is on, every pan and zoom you make is sent to the others. Whoever switches it on takes over from the previous leader.
+
+The receiver keeps the same center and zooms so that at least the sender's whole view is visible, so screens of different size and aspect ratio show the same section. The status bar shows `· leading` or `· following <name>`. Both commands can be given a hotkey in Obsidian's settings.
+
+All participants need this fork: it uses protocol version 3, so the original plugin is rejected with a version notice.
+
+Both instances can run on the same computer: open a second vault in its own window (for example on a smartboard), install the plugin there too, and join the host at `127.0.0.1`.
+
 ## Settings
 
 Cursor name and color, port (default `47321`), session password, folder for new drawings.

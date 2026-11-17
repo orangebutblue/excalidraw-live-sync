@@ -1,10 +1,14 @@
 import { AppStateLike, ExcalidrawAPI, ExcalidrawViewLike, PointerPayload } from "./excalidraw";
 import { t } from "./i18n";
 import type { Snapshot, Transport, TransportEvents, Welcome } from "./net";
-import { BinaryFile, Message, PeerInfo, PointerState, SceneElement } from "./protocol";
+import { BinaryFile, Message, PeerInfo, PointerState, SceneElement, SceneView } from "./protocol";
 
 const FLUSH_INTERVAL = 50;
 const POINTER_INTERVAL = 40;
+const VIEW_INTERVAL = 40;
+// Excalidraw's own zoom limits.
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 30;
 
 interface Viewport {
 	scrollX: number;
@@ -19,6 +23,8 @@ export interface SessionCallbacks {
 	onPeersChanged(): void;
 	onPeerJoined(peer: PeerInfo): void;
 	onPeerLeft(peer: PeerInfo): void;
+	/** `leading` or `leader` changed. */
+	onFollowChanged(): void;
 	onEnded(reason: string): void;
 }
 
@@ -29,9 +35,18 @@ export interface SessionCallbacks {
  * Merging follows Excalidraw's own collab rule: an element with a higher
  * `version` wins, ties go to the lower `versionNonce`. Every peer applies the
  * same rule, so all scenes converge without a central authority.
+ *
+ * Any peer can move the others to the part of the drawing it shows, once
+ * (`shareView`) or on every pan and zoom while `leading` is on. Receivers always
+ * apply an incoming view; whoever switches leading on takes it over from the
+ * previous leader.
  */
 export class LiveSession implements TransportEvents {
 	readonly peers = new Map<string, PeerInfo>();
+	/** Our pans and zooms are pushed to everyone else. */
+	leading = false;
+	/** Id of the peer that is leading, if it isn't us. */
+	leader: string | null = null;
 	transport: Transport | null = null;
 	view: ExcalidrawViewLike | null = null;
 
@@ -49,6 +64,12 @@ export class LiveSession implements TransportEvents {
 	/** Last local pointer and the viewport it was measured in, so panning/zooming can move it too. */
 	private lastPointer: { payload: PointerPayload; viewport: Viewport } | null = null;
 	private collabFrame: number | null = null;
+	private viewTimer: number | null = null;
+	private lastViewSent = 0;
+	private pendingView: SceneView | null = null;
+	private lastSentView: SceneView | null = null;
+	/** What our canvas shows after applying a remote view, so that change isn't sent back. */
+	private appliedView: SceneView | null = null;
 	private ended = false;
 
 	constructor(
@@ -144,6 +165,9 @@ export class LiveSession implements TransportEvents {
 		this.ended = true;
 		if (this.flushTimer !== null) window.clearTimeout(this.flushTimer);
 		if (this.pointerTimer !== null) window.clearTimeout(this.pointerTimer);
+		if (this.viewTimer !== null) window.clearTimeout(this.viewTimer);
+		this.leading = false;
+		this.leader = null;
 		if (this.collabFrame !== null) window.cancelAnimationFrame(this.collabFrame);
 		this.unhook?.();
 		this.unhook = null;
@@ -157,6 +181,22 @@ export class LiveSession implements TransportEvents {
 			// the view may already be gone
 		}
 		this.cb.onEnded(reason);
+	}
+
+	/** Moves everyone else to the part of the drawing we are looking at. */
+	shareView(): void {
+		const view = sceneViewOf(this.api?.getAppState());
+		if (!this.transport || !view) return;
+		this.sendView(view);
+	}
+
+	setLeading(on: boolean): void {
+		if (this.ended || !this.transport || this.leading === on) return;
+		this.leading = on;
+		if (on) this.leader = null;
+		this.transport.send({ t: "follow", on });
+		if (on) this.shareView();
+		this.cb.onFollowChanged();
 	}
 
 	/** True while the view we're bound to is still showing the same file. */
@@ -182,6 +222,12 @@ export class LiveSession implements TransportEvents {
 			case "pointer":
 				if (msg.from) this.updateCollaborator(msg.from, msg.pointer);
 				break;
+			case "view":
+				this.applyView(msg.view);
+				break;
+			case "follow":
+				if (msg.from) this.onRemoteFollow(msg.from, msg.on);
+				break;
 		}
 	}
 
@@ -189,12 +235,21 @@ export class LiveSession implements TransportEvents {
 		this.peers.set(peer.id, peer);
 		this.cb.onPeerJoined(peer);
 		this.cb.onPeersChanged();
+		// Pull the newcomer straight into the view we are leading.
+		if (this.leading && this.transport) {
+			this.transport.send({ t: "follow", on: true });
+			this.shareView();
+		}
 	}
 
 	onPeerLeave(id: string): void {
 		const peer = this.peers.get(id);
 		this.peers.delete(id);
 		if (this.collaborators.delete(id)) this.scheduleCollaborators();
+		if (this.leader === id) {
+			this.leader = null;
+			this.cb.onFollowChanged();
+		}
 		if (peer) this.cb.onPeerLeft(peer);
 		this.cb.onPeersChanged();
 	}
@@ -252,6 +307,11 @@ export class LiveSession implements TransportEvents {
 	 * Re-project the last pointer through the new viewport so peers see it move.
 	 */
 	private onLocalViewport(appState: AppStateLike | undefined): void {
+		this.reprojectPointer(appState);
+		if (this.leading) this.queueView(appState);
+	}
+
+	private reprojectPointer(appState: AppStateLike | undefined): void {
 		const last = this.lastPointer;
 		const viewport = viewportOf(appState);
 		if (!this.transport || !last || !viewport) return;
@@ -299,6 +359,29 @@ export class LiveSession implements TransportEvents {
 		});
 	}
 
+	private queueView(appState: AppStateLike | undefined): void {
+		const view = sceneViewOf(appState);
+		if (!view || !this.transport) return;
+		if (this.lastSentView && sameView(view, this.lastSentView)) return;
+		if (this.appliedView && sameView(view, this.appliedView)) return;
+		this.pendingView = view;
+		if (this.viewTimer !== null) return;
+		const wait = Math.max(0, VIEW_INTERVAL - (Date.now() - this.lastViewSent));
+		this.viewTimer = window.setTimeout(() => {
+			this.viewTimer = null;
+			const pending = this.pendingView;
+			if (pending && this.leading) this.sendView(pending);
+		}, wait);
+	}
+
+	private sendView(view: SceneView): void {
+		if (!this.transport) return;
+		this.pendingView = null;
+		this.lastSentView = view;
+		this.lastViewSent = Date.now();
+		this.transport.send({ t: "view", view });
+	}
+
 	// --- incoming --------------------------------------------------------------
 
 	private mergeRemote(remote: SceneElement[]): void {
@@ -339,6 +422,40 @@ export class LiveSession implements TransportEvents {
 			);
 		}
 		api.updateScene({ elements: next, captureUpdate: "NEVER", commitToHistory: false });
+	}
+
+	/** Fits the remote view into our canvas: same center, zoomed so all of it is visible. */
+	private applyView(remote: SceneView): void {
+		const api = this.api;
+		const state = api?.getAppState();
+		if (!api || !state || !isValidView(remote)) return;
+		const { width, height } = state;
+		if (!isFiniteNumber(width) || !isFiniteNumber(height) || width <= 0 || height <= 0) return;
+		const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(width / remote.w, height / remote.h)));
+		const w = width / zoom;
+		const h = height / zoom;
+		this.appliedView = { cx: remote.cx, cy: remote.cy, w, h };
+		api.updateScene({
+			appState: {
+				scrollX: w / 2 - remote.cx,
+				scrollY: h / 2 - remote.cy,
+				zoom: typeof state.zoom === "number" ? zoom : { value: zoom },
+			},
+			captureUpdate: "NEVER",
+		});
+	}
+
+	private onRemoteFollow(from: string, on: boolean): void {
+		if (on) {
+			if (this.leader === from && !this.leading) return;
+			this.leader = from;
+			this.leading = false;
+		} else if (this.leader === from) {
+			this.leader = null;
+		} else {
+			return;
+		}
+		this.cb.onFollowChanged();
 	}
 
 	private addFiles(files: BinaryFile[]): void {
@@ -386,6 +503,28 @@ function viewportOf(appState: AppStateLike | undefined): Viewport | null {
 	const scrollY = appState?.scrollY;
 	if (!isFiniteNumber(zoom) || !isFiniteNumber(scrollX) || !isFiniteNumber(scrollY) || zoom <= 0) return null;
 	return { scrollX, scrollY, zoom };
+}
+
+function sceneViewOf(appState: AppStateLike | undefined): SceneView | null {
+	const viewport = viewportOf(appState);
+	const width = appState?.width;
+	const height = appState?.height;
+	if (!viewport || !isFiniteNumber(width) || !isFiniteNumber(height) || width <= 0 || height <= 0) return null;
+	const w = width / viewport.zoom;
+	const h = height / viewport.zoom;
+	return { cx: w / 2 - viewport.scrollX, cy: h / 2 - viewport.scrollY, w, h };
+}
+
+function isValidView(v: SceneView | undefined): v is SceneView {
+	return !!v && isFiniteNumber(v.cx) && isFiniteNumber(v.cy) && isFiniteNumber(v.w) && isFiniteNumber(v.h) && v.w > 0 && v.h > 0;
+}
+
+/** Equal up to rounding, which is all a re-measured view differs by. */
+function sameView(a: SceneView, b: SceneView): boolean {
+	const eps = 1e-6 * Math.max(a.w, a.h, 1);
+	return (
+		Math.abs(a.cx - b.cx) < eps && Math.abs(a.cy - b.cy) < eps && Math.abs(a.w - b.w) < eps && Math.abs(a.h - b.h) < eps
+	);
 }
 
 function isFiniteNumber(n: unknown): n is number {

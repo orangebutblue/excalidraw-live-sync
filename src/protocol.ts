@@ -9,7 +9,7 @@
 // length-prefixed frames, AES-GCM sealed when a password is set, starting
 // with the client's `join` and the host's `welcome`.
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 export const HOST_ID = "host";
 
 export type SceneElement = {
@@ -44,6 +44,14 @@ export interface PointerState {
 	selectedElementIds: string[];
 }
 
+/** The visible part of the canvas in scene coordinates: its center and size. */
+export interface SceneView {
+	cx: number;
+	cy: number;
+	w: number;
+	h: number;
+}
+
 export type Message =
 	| { t: "hello"; proto: number }
 	| { t: "open" }
@@ -58,9 +66,16 @@ export type Message =
 	| { t: "elements"; from?: string; elements: SceneElement[] }
 	| { t: "files"; from?: string; files: BinaryFile[] }
 	| { t: "pointer"; from?: string; pointer: PointerState }
+	| { t: "view"; from?: string; view: SceneView }
+	| { t: "follow"; from?: string; on: boolean }
 	| { t: "sync-request"; from?: string }
 	| { t: "ping" }
 	| { t: "pong" };
 
 /** Messages a client may send that the host forwards to the other clients. */
-export const RELAYED: ReadonlySet<Message["t"]> = new Set(["elements", "files", "pointer"]);
+export const RELAYED: ReadonlySet<Message["t"]> = new Set(["elements", "files", "pointer", "view", "follow"]);
+
+/** Messages that are dropped instead of queued when the socket is backed up; a newer one follows anyway. */
+export function isVolatile(msg: Message): boolean {
+	return msg.t === "pointer" || msg.t === "view";
+}

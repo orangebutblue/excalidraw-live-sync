@@ -7,6 +7,10 @@ export const ru: Record<TextKey, string> = {
 	cmdShowAddresses: "Показать адреса для подключения",
 	cmdResync: "Пересинхронизировать рисунок",
 	cmdStop: "Завершить live-сессию",
+	cmdShareView: "Показать всем мой вид (один раз)",
+	cmdLead: "Остальные следуют за моим видом (вкл/выкл)",
+	ribbonShareView: "Live: показать всем мой вид (один раз)",
+	ribbonLead: "Live: остальные следуют за моим видом (вкл/выкл)",
 
 	endStopped: "остановлено вручную",
 	endTabClosed: "вкладка с рисунком закрыта",
@@ -35,6 +39,8 @@ export const ru: Record<TextKey, string> = {
 	menuResync: "Пересинхронизировать",
 	menuEnd: "Завершить сессию",
 	menuLeave: "Отключиться",
+	menuShareView: "Показать всем мой вид",
+	menuLead: "Остальные следуют за моим видом",
 
 	statusOff: "Live: выкл",
 	statusOffTip: "Excalidraw Live — нажми, чтобы начать или подключиться",
@@ -42,6 +48,13 @@ export const ru: Record<TextKey, string> = {
 	statusHostTip: "Хост на порту {port}, участников: {count}",
 	statusClient: "● Live: {host}",
 	statusClientTip: "Подключено к {host}",
+	statusLeading: " · ведёт",
+	statusFollowing: " · следует за {name}",
+
+	noSession: "Live-сессия не запущена",
+	leadOn: "Excalidraw Live: остальные теперь следуют за твоим видом",
+	leadOff: "Excalidraw Live: остальные больше не следуют за твоим видом",
+	followStarted: "Excalidraw Live: следуешь за видом {name}",
 
 	netClosed: "соединение закрыто",
 	netTimeout: "таймаут соединения",

@@ -11,6 +11,9 @@ export interface AppStateLike {
 	scrollY?: number;
 	/** `{ value }` in current Excalidraw, a bare number in older builds. */
 	zoom?: number | { value: number };
+	/** Size of the canvas on screen, in CSS pixels. */
+	width?: number;
+	height?: number;
 	selectedElementIds?: Record<string, boolean>;
 	editingTextElement?: { id: string } | null;
 	editingElement?: { id: string } | null;
@@ -26,6 +29,7 @@ export interface ExcalidrawAPI {
 	updateScene(scene: {
 		elements?: readonly SceneElement[];
 		collaborators?: Map<string, unknown>;
+		appState?: { scrollX?: number; scrollY?: number; zoom?: number | { value: number } };
 		captureUpdate?: "IMMEDIATELY" | "NEVER" | "EVENTUALLY";
 		commitToHistory?: boolean;
 	}): void;
