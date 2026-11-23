@@ -1,7 +1,5 @@
 # Excalidraw Live Sync
 
-[Русская версия](README.ru.md)
-
 Live collaboration for the [Excalidraw](https://github.com/zsviczian/obsidian-excalidraw-plugin) plugin in Obsidian:
 several people draw on the same board in real time and see each other's cursors and laser pointer.
 
