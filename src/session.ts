@@ -64,6 +64,8 @@ export class LiveSession implements TransportEvents {
 	/** Last local pointer and the viewport it was measured in, so panning/zooming can move it too. */
 	private lastPointer: { payload: PointerPayload; viewport: Viewport } | null = null;
 	private collabFrame: number | null = null;
+	private pollTimer: number | null = null;
+	private polledViewport: Viewport | null = null;
 	private viewTimer: number | null = null;
 	private lastViewSent = 0;
 	private pendingView: SceneView | null = null;
@@ -112,6 +114,28 @@ export class LiveSession implements TransportEvents {
 				else Reflect.deleteProperty(view, key);
 			});
 		};
+
+		// Excalidraw plugin ≤2.22 binds view.onChange/onPointerUpdate at mount, so the
+		// hooks above never fire on a view that was already open; poll the API instead.
+		// flush()/queueView() diff against what was sent, so polling is idempotent where
+		// the hooks do work (and stays the only source of pointer updates).
+		this.polledViewport = viewportOf(view.excalidrawAPI?.getAppState());
+		this.pollTimer = window.setInterval(() => this.poll(), FLUSH_INTERVAL);
+	}
+
+	/** Fallback change detection for views whose onChange hook can't fire. */
+	private poll(): void {
+		if (this.ended) return;
+		const appState = this.api?.getAppState();
+		const viewport = viewportOf(appState);
+		const prev = this.polledViewport;
+		if (viewport) {
+			this.polledViewport = viewport;
+			if (!prev || viewport.scrollX !== prev.scrollX || viewport.scrollY !== prev.scrollY || viewport.zoom !== prev.zoom) {
+				this.onLocalViewport(appState);
+			}
+		}
+		this.scheduleFlush();
 	}
 
 	/** Host: everything already on the canvas reaches newcomers through the welcome snapshot. */
@@ -166,6 +190,7 @@ export class LiveSession implements TransportEvents {
 		if (this.flushTimer !== null) window.clearTimeout(this.flushTimer);
 		if (this.pointerTimer !== null) window.clearTimeout(this.pointerTimer);
 		if (this.viewTimer !== null) window.clearTimeout(this.viewTimer);
+		if (this.pollTimer !== null) window.clearInterval(this.pollTimer);
 		this.leading = false;
 		this.leader = null;
 		if (this.collabFrame !== null) window.cancelAnimationFrame(this.collabFrame);
