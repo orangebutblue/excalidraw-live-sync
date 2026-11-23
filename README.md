@@ -119,14 +119,22 @@ Without a password anyone on the network can join, and traffic is not encrypted.
 
 ## Releasing
 
-Bump `version` in `manifest.json` and `package.json`, commit, and push a tag with the same number:
+Bump `version` in `manifest.json` and `package.json` and commit. Then either push a tag with the same number (a GitHub Action builds and publishes the release):
 
 ```bash
 git tag 0.3.2
 git push origin 0.3.2
 ```
 
-A GitHub Action builds the plugin, attests the build provenance and publishes a release with `main.js`, `manifest.json` and `styles.css`.
+or build and publish locally with the GitHub CLI:
+
+```bash
+npm ci
+npm run build
+gh release create 0.3.2 main.js manifest.json styles.css --title 0.3.2 --generate-notes
+```
+
+Both produce a release with `main.js`, `manifest.json` and `styles.css`, which is what Obsidian and BRAT install.
 
 ## Limitations
 
