@@ -37,11 +37,11 @@ Everyone in a session needs the plugin, and the versions must match. The Excalid
 
 **With BRAT** (updates arrive automatically)
 1. *Settings → Community plugins → Browse* → install and enable **BRAT**.
-2. *BRAT → Add Beta plugin* → enter `SHENID1/excalidraw-live-sync`.
+2. *BRAT → Add Beta plugin* → enter `orangebutblue/excalidraw-live-sync`.
 3. Enable **Excalidraw Live Sync** in the list of community plugins.
 
 **Manually**
-Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/SHENID1/excalidraw-live-sync/releases/latest)
+Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/orangebutblue/excalidraw-live-sync/releases/latest)
 into `<vault>/.obsidian/plugins/excalidraw-live-sync/`, then enable the plugin.
 
 **From source**

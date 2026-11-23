@@ -35,11 +35,11 @@ Live-режим для плагина [Excalidraw](https://github.com/zsviczian/
 
 **Через BRAT (рекомендуется — обновления приходят сами)**
 1. *Настройки → Сторонние плагины → Обзор* → найти и установить **BRAT**, включить.
-2. *BRAT → Add Beta plugin* → ввести `SHENID1/excalidraw-live-sync`.
+2. *BRAT → Add Beta plugin* → ввести `orangebutblue/excalidraw-live-sync`.
 3. Включить **Excalidraw Live Sync** в списке сторонних плагинов.
 
 **Вручную**
-Скачать `main.js`, `manifest.json`, `styles.css` из [последнего релиза](https://github.com/SHENID1/excalidraw-live-sync/releases/latest)
+Скачать `main.js`, `manifest.json`, `styles.css` из [последнего релиза](https://github.com/orangebutblue/excalidraw-live-sync/releases/latest)
 в папку `<хранилище>/.obsidian/plugins/excalidraw-live-sync/`, затем включить плагин.
 
 **Из исходников**
