@@ -117,7 +117,7 @@ Without a password anyone on the network can join, and traffic is not encrypted.
 
 ## Releasing
 
-Bump `version` in `manifest.json` and `package.json`, commit and push to `main`. The Release GitHub Action builds the plugin and, for a version that has not been published yet, creates the tag and release automatically. Pushing a matching version tag directly works too. Existing releases are never overwritten.
+Bump `version` in `manifest.json`, `package.json` and `package-lock.json`, commit and push to `main`. The Release GitHub Action builds the plugin and, for a version that has not been published yet, creates the tag and release automatically. Pushing a matching version tag directly works too. Existing releases are never overwritten.
 
 Releases contain `main.js`, `manifest.json` and `styles.css`, which is what Obsidian and BRAT install.
 
